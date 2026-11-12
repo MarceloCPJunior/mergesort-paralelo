@@ -16,8 +16,8 @@ Guia de trabalho do projeto. Leia este arquivo primeiro; depois, o guia da sua f
 | Frente | Responsável | Entrega principal |
 |---|---|---|
 | 1. Baseline, perfil e análise | Marcelo (MarceloCPJunior) | Tempos do baseline, perfil gprof, estimativa de Amdahl, `scripts/medir.sh`, `scripts/graficos.py` |
-| 2. OpenMP | David Biage da Silva | `openmp/mergesort_omp.cpp`, estudo do cutoff, tratamento de corrida, curva por threads |
-| 3. MPI | Thiago PP | `mpi/mergesort_mpi.cpp`, coletivas, overhead de comunicação, curva por processos |
+| 2. OpenMP | David Biage da Silva e Thiago PP | `openmp/mergesort_omp.cpp`, estudo do cutoff, tratamento de corrida, curva por threads |
+| 3. MPI | Gabriel Paiva (GabrielPaivaM) | `mpi/mergesort_mpi.cpp`, coletivas, overhead de comunicação, curva por processos |
 
 Os mesmos nomes estão no `AUTORES.md`, exigido pelo enunciado.
 
@@ -48,9 +48,9 @@ O enunciado avalia o histórico de commits e penaliza "commit único" ou "trabal
 
   | Autor do PR | Quem revisa |
   |---|---|
-  | Frente 1 (Marcelo) | Frente 3 (Thiago PP) |
-  | Frente 2 (David Biage da Silva) | Frente 1 (Marcelo) |
-  | Frente 3 (Thiago PP) | Frente 2 (David Biage da Silva) |
+  | Frente 1 (Marcelo) | Frente 3 (Gabriel Paiva) |
+  | Frente 2 (David Biage da Silva e Thiago PP) | Frente 1 (Marcelo) |
+  | Frente 3 (Gabriel Paiva) | Frente 2 (David Biage da Silva e Thiago PP) |
 
 - **Commits pequenos e frequentes**, com mensagem em português dizendo o que mudou e por quê. Exemplo: `OpenMP: adiciona cutoff de 10000 após varredura (ver resultados/cutoff.csv)`.
 - **Antes de abrir um PR:** `make` sem warnings, e a validação do `docs/contrato.md` passando.

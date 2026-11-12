@@ -1,5 +1,7 @@
 # Frente 2 — MergeSort paralelo com OpenMP
 
+Responsáveis: David Biage da Silva e Thiago PP · Revisor dos seus PRs: frente 1 (Marcelo) · Vocês revisam: frente 3, MPI (Gabriel Paiva)
+
 ## 1. Objetivo
 
 Implementar e avaliar uma versão paralela do MergeSort utilizando OpenMP,

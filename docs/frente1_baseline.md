@@ -1,6 +1,6 @@
 # Frente 1 — Baseline, perfil e análise
 
-Responsável: Marcelo (MarceloCPJunior) · Revisor dos seus PRs: frente 3 (Thiago PP) · Você revisa: frente 2, OpenMP (David Biage da Silva)
+Responsável: Marcelo (MarceloCPJunior) · Revisor dos seus PRs: frente 3 (Gabriel Paiva) · Você revisa: frente 2, OpenMP (David Biage da Silva e Thiago PP)
 
 ## Objetivo
 
