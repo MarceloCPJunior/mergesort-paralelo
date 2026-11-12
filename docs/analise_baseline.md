@@ -2,10 +2,11 @@
 
 Frente 1 · Problema 07 (mergesort) · CCO085 IESB 2026/2
 
-> **Medição preliminar.** Os números abaixo foram medidos em 05/11/2026 numa máquina de nuvem
-> (Intel Xeon @ 2,10 GHz, 4 núcleos lógicos, g++ 13.3, `-O2`; detalhes em `resultados/maquina.txt`).
-> As medições finais serão refeitas na máquina de referência com `bash scripts/medir.sh`.
-> As **proporções** (porcentagens, razões, speedups previstos) devem se manter; os tempos absolutos mudam.
+> **Máquinas.** A seção 3 traz o baseline da **medição final** (12/11/2026, Intel Core i5-13420H,
+> 12 núcleos lógicos; `resultados/maquina.txt`), a mesma das versões paralelas. O perfil e a análise
+> por nível (seções 4 e 5) foram medidos em 05/11/2026 numa máquina de nuvem (Intel Xeon @ 2,10 GHz,
+> 4 núcleos): os tempos absolutos diferem, mas as **proporções** (porcentagens, custo por nível,
+> speedups previstos) não dependem da máquina.
 
 ## 1. O que o programa faz
 
@@ -35,22 +36,25 @@ volta para `a`.
 
 ## 3. Baseline medido
 
+Medição final (`resultados/baseline.csv`):
+
 | n | Mediana | Menor – maior (4 repetições) |
 |---|---|---|
-| 5.000.000 | **0,595 s** | 0,568 – 0,618 s |
-| 20.000.000 | **2,526 s** | 2,335 – 2,600 s |
-| 80.000.000 | **11,034 s** | 10,862 – 11,700 s |
+| 5.000.000 | **0,445 s** | 0,433 – 0,458 s |
+| 20.000.000 | **1,935 s** | 1,904 – 1,985 s |
+| 80.000.000 | **8,326 s** | 8,293 – 8,414 s |
 
-A dispersão chega a ~10% entre repetições do mesmo programa com a mesma entrada (em 20 M). Por isso
-uma execução isolada não serve como medida, e usamos a mediana.
+A dispersão entre repetições do mesmo programa com a mesma entrada chegou a ~6% nesta máquina (e
+a ~10% na máquina de nuvem da medição preliminar). Por isso uma execução isolada não serve como
+medida, e usamos a mediana.
 
 **A complexidade O(n log n) aparece nos dados.** Ao multiplicar n por 4, um algoritmo O(n) ficaria 4×
 mais lento; O(n log n) prevê um pouco mais, porque log n também cresce:
 
 | Passo | Previsto: 4 × log₂(4n) / log₂n | Medido |
 |---|---|---|
-| 5 M → 20 M | 4 × 24,25 / 22,25 = **4,36×** | 2,526 / 0,595 = **4,24×** |
-| 20 M → 80 M | 4 × 26,25 / 24,25 = **4,33×** | 11,034 / 2,526 = **4,37×** |
+| 5 M → 20 M | 4 × 24,25 / 22,25 = **4,36×** | 1,935 / 0,445 = **4,35×** |
+| 20 M → 80 M | 4 × 26,25 / 24,25 = **4,33×** | 8,326 / 1,935 = **4,30×** |
 
 ## 4. Perfilamento: onde o tempo é gasto
 
