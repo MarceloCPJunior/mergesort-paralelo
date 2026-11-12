@@ -1,0 +1,6 @@
+data: 2026-11-12 04:56
+nproc: 4
+cpu: AMD EPYC 7763 64-Core Processor
+compilador: g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+mpi: mpirun (Open MPI) 4.1.6
+repeticoes: 5 (1a descartada)
