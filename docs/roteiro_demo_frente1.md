@@ -1,174 +1,146 @@
-# Roteiro de demonstração — frente 1 (etapas 1 e 2)
+# Roteiro de demonstração
 
-Testes para rodar e mostrar ao professor, na ordem. Para cada um: comando, saída esperada,
-o que ele prova e o que dizer.
+Testes para rodar e mostrar ao professor, na ordem. Para cada um: comando, saída esperada e o que
+ele prova.
 
 - Os **checksums** são determinísticos: têm de dar **exatamente** os números abaixo em qualquer máquina.
-- Os **tempos** dependem da máquina e variam entre execuções.
+- Os **tempos** dependem da máquina. Os de referência abaixo são da medição final (i5-13420H, 12
+  núcleos lógicos).
+- **p (threads ou processos) só até o `nproc`** da máquina da demonstração.
 
-## Preparação
+## 0. Preparação
 
 ```bash
 git checkout main && git pull
-nproc        # quantos núcleos o contêiner enxerga
+nproc            # quantos núcleos lógicos; o speedup precisa de vários
+make             # compila as 5 versões
+ls bin/          # gabarito  mergesort_mpi  mergesort_omp  mergesort_seq  perfil_trechos
 ```
 
-Se `nproc` der 1 ou 2: Docker Desktop → Settings → Resources → CPUs, e reabrir o contêiner.
+Se o `nproc` der 1 ou 2 no contêiner: Docker Desktop → Settings → Resources → CPUs, e reabrir.
 
-## Teste 1 — compilar
-
-```bash
-make
-```
-
-**Esperado:** linhas `g++ -O2 -Wall -std=c++17 ...` para `gabarito`, `mergesort_seq` e
-`perfil_trechos`, sem nenhum `warning`.
-
-**Dizer:** "Tudo compila com `-O2` (medir sem otimização não tem sentido) e `-Wall` (todos os
-avisos ligados), sem nenhum aviso. Se o código comum mudar, o Makefile recompila tudo."
-
-## Teste 2 — o baseline do professor
-
-```bash
-./bin/mergesort_seq 20000000
-```
-
-**Esperado:** `n=20000000  ordenado=SIM  tempo=... s`
-
-**Dizer:** "É o código do professor, sem alteração. Define o resultado correto e o tempo de
-referência do speedup. Só a ordenação é cronometrada."
-
-## Teste 3 — o gabarito
+## 1. As três versões chegam ao mesmo resultado
 
 ```bash
 ./bin/gabarito 20000000
+OMP_NUM_THREADS=4 ./bin/mergesort_omp 20000000 4
+mpirun -np 4 ./bin/mergesort_mpi 20000000
 ```
 
-**Esperado:**
-```
-versao=seq n=20000000 p=1 ordenado=SIM checksum=10913123743811272712 tempo=... confere_std_sort=SIM
-```
+**Esperado:** as três linhas com `ordenado=SIM` e **`checksum=10913123743811272712`**; o gabarito
+também com `confere_std_sort=SIM`.
 
-**Mostrar:** o mesmo número na tabela da seção 3 do `docs/contrato.md`.
+**Dizer:** "Os três ordenaram o mesmo vetor de 20 milhões de números: um núcleo, 4 threads com
+memória compartilhada e 4 processos com memória separada. Os três deram o mesmo checksum, que
+depende de cada valor e da sua posição: as versões paralelas chegam exatamente ao resultado do
+baseline."
 
-**Dizer:**
-- "`ordenado=SIM` só garante a ordem: um MPI que perde elementos ainda sai ordenado."
-- "O checksum soma valor × (posição + 1) do vetor ordenado. O vetor ordenado é único, então toda
-  versão tem de chegar a esse número."
-- "`confere_std_sort=SIM`: o gabarito também ordena com o `std::sort` (outro algoritmo) e os dois
-  vetores são idênticos posição por posição. É a garantia de que o próprio gabarito está certo."
-- "Deu o mesmo número aqui e em outra máquina: a entrada é determinística (semente 12345)."
-
-## Teste 4 — conferir à mão
+## 2. As versões paralelas aceleram
 
 ```bash
-./bin/gabarito 5
+./bin/mergesort_seq 20000000
+for p in 1 2 4 8; do OMP_NUM_THREADS=$p ./bin/mergesort_omp 20000000 $p; done
+for p in 1 2 4 8; do mpirun --use-hwthread-cpus --bind-to none -np $p ./bin/mergesort_mpi 20000000; done
 ```
 
-**Esperado:** `checksum=13786685956 ... confere_std_sort=SIM`
+**Referência** (medição final, n = 20 M; baseline 1,935 s):
 
-Vetor ordenado com n = 5: `[67366457, 70888153, 494493491, 1092397125, 1544894844]`
+| p | OpenMP | MPI | Previsto (Amdahl) |
+|---|---|---|---|
+| 2 | 1,00 s (1,93×) | 1,04 s (1,86×) | 1,92× |
+| 4 | 0,76 s (2,56×) | 0,62 s (3,11×) | 3,43× |
+| 8 | 0,60 s (3,24×) | 0,48 s (4,07×) | 5,50× |
 
-```
-1×67366457 + 2×70888153 + 3×494493491 + 4×1092397125 + 5×1544894844 = 13786685956
-```
+Uma execução isolada varia; os números oficiais são medianas do `medir.sh`.
 
-## Teste 5 — os três tamanhos oficiais
+**Dizer:** "Com 2 núcleos o speedup bate com a previsão de Amdahl. Acima disso fica abaixo: os merges
+do topo da árvore são seriais, a máquina tem só 4 núcleos de desempenho e, no MPI, a comunicação
+cresce com o número de processos."
+
+No MPI, os campos depois de `tempo=` mostram a divisão do tempo: `t_scatter` (distribuir),
+`t_sort_local` (ordenar cada pedaço), `t_arvore_comunic` e `t_arvore_merge` (juntar).
+
+## 3. A bateria de corretude
 
 ```bash
-./bin/gabarito 5000000      # checksum=274690690090403620
-./bin/gabarito 80000000     # checksum=12926150509224156323
+bash scripts/validar.sh rapido     # ~15 s
 ```
 
-## Teste 6 — o script de medição
+**Esperado:** as matrizes do OpenMP e do MPI só com ✓ e `TUDO CERTO: 84 de 84 casos passaram`.
+
+**Dizer:** "Testa n pequenos e p de 1 a 8, inclusive n menor que p e n não divisível por p, onde os
+erros de divisão aparecem. A versão completa (`bash scripts/validar.sh`, ~1 min) inclui n de 1 milhão
+e 20 milhões e deu 112 de 112."
+
+## 4. O gráfico de speedup
+
+Abrir `graficos/forte_speedup.png` (também aparece no README do GitHub).
+
+**Dizer:** "Três níveis: o ideal (S = p), o previsto pela árvore e o medido. A distância entre o
+ideal e o previsto é a parte serial do algoritmo; entre o previsto e o medido, o que o modelo não
+considera: hardware e comunicação."
+
+## 5. (Opcional) O cutoff do OpenMP
 
 ```bash
-bash scripts/medir.sh baseline 3
-cat resultados/baseline.csv
-cat resultados/maquina.txt
+OMP_NUM_THREADS=4 ./bin/mergesort_omp 20000000 4 1024
+OMP_NUM_THREADS=4 ./bin/mergesort_omp 20000000 4 65536
 ```
 
-Use `bash scripts/medir.sh` (não `./scripts/...`). Com 3 repetições leva cerca de 1 minuto.
+O terceiro argumento é o cutoff: abaixo dele, a recursão segue sequencial. Na medição, de 1.024 a
+65.536 as diferenças ficaram dentro do ruído.
 
-**Esperado:** três linhas `seq n=... ok (checksum confere)` e uma tabela de medianas com
-`(2)` repetições por tamanho (3 rodadas menos a 1ª, descartada).
-
-**Dizer:**
-- "Roda cada tamanho várias vezes, **descarta a 1ª** (aquecimento: cache e memória frias) e usa a
-  **mediana**, que não é puxada por uma execução isolada lenta. Medi variação de ~10% entre
-  execuções iguais."
-- "**Toda execução é validada**; se a ordem ou o checksum falhar, o script para."
-- "Os dados brutos ficam no CSV e a máquina no `maquina.txt`: um tempo sem a máquina que o
-  produziu não pode ser comparado."
-- "Já está pronto para o OpenMP e o MPI: mede escalabilidade forte e fraca quando os binários existirem."
-- Extra: "quando n multiplica por 4, o tempo multiplica por ~4,3, um pouco mais que 4, porque o
-  algoritmo é O(n log n)."
-
-## Teste 7 (opcional) — a validação barrando um erro
-
-Cria uma versão OpenMP **falsa** que devolve um checksum errado e mostra que o script recusa:
+## 6. (Opcional) Medir e gerar os gráficos ao vivo
 
 ```bash
-printf '#!/bin/bash\n./bin/gabarito "$1" | sed "s/checksum=[0-9]*/checksum=123/"\n' > bin/mergesort_omp
-chmod +x bin/mergesort_omp
-bash scripts/medir.sh forte 2
+bash scripts/medir.sh baseline 3 && bash scripts/medir.sh forte 3     # ~2 min
+python3 scripts/graficos.py
 ```
 
-**Esperado:**
-```
-ERRO: omp n=20000000 p=1 checksum 123 != gabarito 10913123743811272712
-```
+Meça o baseline **na mesma rodada**: o speedup usa o tempo do baseline como T₁, e um baseline de
+outra sessão ou máquina distorce a conta.
 
-**Dizer:** "Simulei uma versão paralela com resultado errado. O script compara com o gabarito e
-para na primeira execução, sem gravar nenhum tempo."
+Para medir tudo do jeito oficial: `bash scripts/medir.sh` (~5 min) e depois `python3 scripts/graficos.py`.
 
-**Depois do teste, limpe** (senão o script vai achar que o falso é o OpenMP de verdade):
-
-```bash
-rm bin/mergesort_omp resultados/forte.csv resultados/mpi_comunicacao.csv
-```
-
-## Depois da demonstração
-
-Os testes 6 e 7 reescrevem `resultados/baseline.csv` e `resultados/maquina.txt` com os dados da
-sua máquina; `git status` vai mostrá-los como modificados. Para voltar aos dados do repositório:
-
-```bash
-git checkout -- resultados/
-```
-
-Só faça commit desses arquivos quando for a medição oficial, na máquina de referência.
-
-## Se pedirem a etapa 3 (só por cima)
+## 7. Se pedirem o perfil (etapa 3)
 
 ```bash
 make perfil && ./bin/mergesort_seq_pg 20000000 && gprof -b -p bin/mergesort_seq_pg gmon.out | head -8
 ```
 
 `merge` ≈ 96% do tempo. Frase-chave: "o perfil diz onde está o tempo, não quanto dele é
-paralelizável: o merge do topo da árvore roda numa thread só. A previsão de Amdahl é speedup ≈ 3,4
-com 4 núcleos e ≈ 11 no máximo. Detalhes em `docs/analise_baseline.md`."
+paralelizável: o merge do topo da árvore roda numa thread só."
+
+## Depois de qualquer teste: limpar
+
+Os testes 3 e 6 reescrevem arquivos em `resultados/` e `graficos/`. Para voltar ao que está no
+repositório (a medição oficial):
+
+```bash
+git checkout -- resultados/ graficos/
+git status        # deve dizer "nothing to commit, working tree clean"
+```
+
+Só faça commit desses arquivos se for uma nova medição oficial.
 
 ## Perguntas prováveis
 
 | Pergunta | Resposta curta |
 |---|---|
-| Por que não basta `ordenado=SIM`? | Só confere a ordem; um vetor que perdeu ou duplicou elementos ainda sai ordenado |
-| Por que o checksum tem peso de posição? | Sem peso, trocas de lugar e erros que se compensam (3 e 5 virando 4 e 4) passariam |
-| Por que peso i + 1 e não i? | Com peso i, a posição 0 vale zero: trocar o primeiro elemento não mudaria nada |
-| Por que `uint64_t` e não `double`? | `double` arredonda e a ordem da soma muda o resultado; inteiro sem sinal é exato e dá a volta de forma garantida |
-| Como sabe que o gabarito está certo? | Usa o algoritmo do professor (que define o correto) e é conferido posição por posição com o `std::sort` |
-| Por que descartar a 1ª execução? | Aquecimento: cache e páginas de memória ainda frias |
-| Por que mediana e não média? | A mediana ignora uma execução isolada muito lenta; a média seria puxada por ela |
-| Por que validar todas as execuções? | Bug de concorrência pode aparecer só às vezes, ou só com certo número de threads |
-| Por que p só até `nproc`? | Acima disso as threads dividem núcleos e o tempo piora por motivo alheio ao algoritmo |
-| Por que o código comum num `.hpp`? | As três versões usam exatamente a mesma entrada e o mesmo algoritmo; uma diferença de resultado só pode vir da parte paralela |
+| Como sabem que as versões estão corretas? | Checksum com peso de posição, igual ao do gabarito, em 112 casos (vários n e p) e em toda execução medida |
+| Por que o speedup não é 4 com 4 núcleos? | O merge do topo roda numa thread só (Amdahl prevê 3,43); acima disso, hardware e comunicação |
+| Por que o MPI foi mais rápido que o OpenMP? | Resultado sistemático, causa não isolada; hipóteses: localidade de cache, posição das threads nos núcleos P e E, número de tasks |
+| Qual o T₁ do speedup? | O tempo do baseline do professor, não o da versão paralela com 1 thread |
+| Por que mediana e descartar a 1ª? | A 1ª é aquecimento; a mediana ignora execuções atrapalhadas por fatores externos |
+| Por que `Scatterv` no MPI? | Com n não divisível por p, o `Scatter` perderia `n % p` elementos |
+| Por que `taskwait` no OpenMP? | O merge só pode começar com as duas metades prontas |
 
 ## Problemas comuns
 
 | Sintoma | Solução |
 |---|---|
-| `$'\r': command not found` | `sed -i 's/\r$//' scripts/medir.sh` (quebra de linha do Windows) |
-| `Permission denied` em `./scripts/medir.sh` | Use `bash scripts/medir.sh` |
+| `git pull` reclama de arquivos em `resultados/` | `git checkout -- resultados/` e apagar os CSVs novos que os scripts criaram |
+| `mpirun` recusa rodar como root | No contêiner do projeto já está liberado; fora dele: `export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1` |
+| `$'\r': command not found` | `sed -i 's/\r$//' scripts/*.sh` (quebra de linha do Windows) |
+| `Permission denied` em `./scripts/...` | Use `bash scripts/...` |
 | `nproc` mostra 1 ou 2 | Docker Desktop → Settings → Resources → CPUs |
-| `git pull` diz "commit your changes or stash them" logo após clonar | `git stash && git pull && git stash drop` (eram só quebras de linha) |
