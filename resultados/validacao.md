@@ -1,7 +1,7 @@
 # Validação de corretude
 
-Gerado por `scripts/validar.sh completo` em 2026-11-12 04:51,
-código `60d4a7f`, máquina com 4 núcleos lógicos.
+Gerado por `scripts/validar.sh rapido` em 2026-11-12 20:51,
+código `35916fc`, máquina com 12 núcleos lógicos.
 
 Uma versão passa num caso (n, p) se termina sem erro, imprime `ordenado=SIM` e o
 **mesmo checksum do gabarito** para aquele n (`docs/contrato.md`, seção 3).
@@ -16,8 +16,17 @@ Uma versão passa num caso (n, p) se termina sem erro, imprime `ordenado=SIM` e 
 | 7 | 30816663511 | sim |
 | 10 | 67097535705 | sim |
 | 1000 | 713889241344622 | sim |
-| 1000003 | 14535403353695342139 | sim |
-| 20000003 | 11014411462828395110 | sim |
+
+## OpenMP (threads)
+
+| n \ p | 1 | 2 | 3 | 4 | 5 | 7 | 8 |
+|---|---|---|---|---|---|---|---|
+| 1 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 2 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 3 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 7 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 10 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 1000 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ## MPI (processos)
 
@@ -29,9 +38,7 @@ Uma versão passa num caso (n, p) se termina sem erro, imprime `ordenado=SIM` e 
 | 7 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 10 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 1000 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 1000003 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 20000003 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ## Resultado
 
-**56 de 56 casos passaram.**
+**84 de 84 casos passaram.**

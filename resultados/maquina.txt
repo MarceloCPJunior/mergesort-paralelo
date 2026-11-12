@@ -1,6 +1,6 @@
-data: 2026-11-05 18:35
-nproc: 4
-cpu: Intel(R) Xeon(R) Processor @ 2.10GHz
+data: 2026-11-12 20:53
+nproc: 12
+cpu: 13th Gen Intel(R) Core(TM) i5-13420H
 compilador: g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
 mpi: mpirun (Open MPI) 4.1.6
 repeticoes: 5 (1a descartada)

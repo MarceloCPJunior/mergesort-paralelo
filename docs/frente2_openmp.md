@@ -1,84 +1,145 @@
-# Frente 2 — Versão OpenMP (memória compartilhada)
+# Frente 2 — MergeSort paralelo com OpenMP
 
-Responsável: David Biage da Silva · Revisor dos seus PRs: frente 1 (Marcelo) · Você revisa: frente 3, MPI (Thiago PP)
+## 1. Objetivo
 
-## Objetivo
+Implementar e avaliar uma versão paralela do MergeSort utilizando OpenMP,
+preservando a lógica sequencial de intercalação e ordenação nas folhas.
 
-Paralelizar o mergesort com OpenMP mantendo exatamente o resultado do baseline, tratar explicitamente as condições de corrida e medir o speedup por número de threads. Valor no artefato: **1,0 ponto**.
+A implementação utiliza tarefas recursivas para explorar o paralelismo
+entre as duas metades do vetor.
 
-## Entregas
+## 2. Estratégia de paralelização
 
-- [ ] `openmp/mergesort_omp.cpp` usando `comum/mergesort_comum.hpp`, com saída no formato do contrato.
-- [ ] Paralelismo com `task` + `taskwait` e cutoff configurável.
-- [ ] Varredura do cutoff (`resultados/cutoff.csv`) e escolha justificada pelos dados.
-- [ ] Tratamento de corrida: argumento de por que a ordenação não tem corrida + checksum em paralelo com `reduction`, comparado a `critical` e `atomic`.
-- [ ] Discussão de escalonamento: tasks × `omp for` com `static`/`dynamic`/`guided`.
-- [ ] Curva de speedup com 1, 2, 4, 8 threads, checksum validado em todas.
+O vetor é dividido recursivamente em duas regiões:
 
-## Passo a passo
+- região esquerda: [lo, mid);
+- região direita: [mid, hi).
 
-### 1. Estudo (semana 1)
-- Aula 4 da página de aulas; códigos `006_sincronizacao_*` e `01_openmp/03_condicao_corrida.c`.
-- Escreva um exemplo pequeno com tasks (soma recursiva ou Fibonacci) **antes** de mexer no mergesort.
+Cada região pode ser processada por uma tarefa independente.
+Após a conclusão das duas tarefas, o algoritmo realiza a intercalação
+das metades ordenadas.
 
-### 2. Checksum no código comum (com o trio)
-Implemente `checksum` do contrato. Depois faça uma versão paralela com `reduction(+:c)` e compare tempos com `critical` e `atomic` — esse é o seu experimento de condição de corrida.
+## 3. Diretivas OpenMP utilizadas
 
-### 3. Versão com tasks
-Estrutura:
-```
-#pragma omp parallel
-#pragma omp single
-   msort_paralelo(a, tmp, 0, n, cutoff)
-
-msort_paralelo:
-   se o pedaço ≤ cutoff → msort sequencial (do código comum)
-   senão:
-      task para a metade esquerda
-      a metade direita na própria thread
-      taskwait
-      merge
-```
-
-### 4. Validar
-```bash
-make openmp
-for t in 1 2 4; do OMP_NUM_THREADS=$t ./bin/mergesort_omp 20000000 $t; done
-bash scripts/validar.sh rapido     # bateria de corretude: n pequenos, 1 a 8 threads
-```
-O checksum tem que ser idêntico ao gabarito com qualquer número de threads. Antes do PR, rode
-`bash scripts/validar.sh` completo.
-
-### 5. Varredura do cutoff
-Com 4 threads e n = 20 M, teste cutoffs de 100 a 1.000.000 (potências de 10 e intermediários). Escolha pelo menor tempo e explique a forma da curva.
-
-### 6. Curva de speedup
-Pelo `scripts/medir.sh` da frente 1. Compare com a previsão de Amdahl (S(4) ≈ 3,43).
-
-## Decisões a justificar
-
-| Decisão | Escolha | Por quê |
+| Diretiva | Aplicação | Justificativa |
 |---|---|---|
-| Padrão (tasks × laço × sections) | | |
-| Cláusulas de dados de cada task | | |
-| Valor do cutoff | | |
-| critical × atomic × reduction no checksum | | |
-| Escalonamento | | |
+| parallel | Região paralela principal | Disponibiliza equipe de threads |
+| single | Inicialização da recursão | Evita iniciar o MergeSort várias vezes |
+| task | Chamadas recursivas esquerda e direita | Permite execução concorrente das regiões |
+| taskwait | Antes do merge da região pai | Garante que as duas regiões terminaram |
 
-## Armadilhas
+## 4. Condições de corrida e sincronização
 
-- **Cópia invisível:** numa task, um parâmetro passado por referência (`vector<int>& a`) é `firstprivate` por padrão, ou seja, **o vetor inteiro é copiado em cada task**. Coloque os vetores em `shared(a, tmp)`. (Explicado na aula 4.)
-- Esquecer o `single`: todas as threads começariam a mesma recursão e ordenariam o vetor ao mesmo tempo.
-- Esquecer o `taskwait`: o `merge` começaria antes das metades estarem prontas. Às vezes funciona, às vezes não — o pior tipo de bug.
-- Cutoff pequeno demais: o tempo vai todo para gerenciar tasks (no exemplo da aula, 270× mais lento).
-- Medir com 1 núcleo: a corrida não aparece e o speedup também não.
+As tarefas esquerda e direita operam em intervalos disjuntos do vetor.
+Consequentemente, não escrevem simultaneamente nas mesmas posições
+de a ou tmp.
 
-## Perguntas de arguição (sobre esta frente)
+A diretiva taskwait garante que as tarefas filhas terminem antes
+da intercalação realizada pela tarefa pai.
 
-1. O que acontece se o `taskwait` for removido?
-2. Por que a ordenação com tasks não tem condição de corrida, se todas as threads escrevem no mesmo vetor?
-3. Por que `single`? O que aconteceria sem ele?
-4. Por que a curva de speedup satura antes do número de núcleos?
-5. Por que `reduction` é mais rápido que `atomic` e `critical`?
-6. O que é false sharing? Por que ele é pequeno no mergesort?
-7. Por que não usar `schedule(dynamic)` aqui?
+Não foi necessário utilizar critical ou atomic na ordenação,
+pois o algoritmo não possui atualizações concorrentes sobre uma
+mesma posição de memória.
+
+### Escolha entre critical, atomic e reduction
+
+| Recurso | Uso | Decisão |
+|---|---|---|
+| critical | Exclusão mútua de uma região | Não utilizado na ordenação; criaria serialização desnecessária |
+| atomic | Proteção de uma operação simples | Não utilizado; não existem incrementos concorrentes compartilhados no algoritmo |
+| reduction | Combinação de resultados privados | Não utilizado; checksum é calculado após a região paralela |
+
+A ausência dessas diretivas na ordenação é uma decisão baseada na
+estrutura do algoritmo, não uma ausência de sincronização.
+A sincronização necessária é realizada com taskwait.
+
+## 5. Estratégias de escalonamento
+
+| Estratégia | Funcionamento | Aplicabilidade |
+|---|---|---|
+| static | Distribuição previamente definida de iterações | Adequada a loops paralelos regulares |
+| dynamic | Distribuição de blocos conforme threads ficam disponíveis | Útil quando iterações têm custos diferentes |
+| guided | Blocos inicialmente maiores e progressivamente menores | Busca equilibrar overhead e distribuição |
+| tasks | Unidades de trabalho independentes agendadas pelo runtime | Adequada à recursão do MergeSort |
+
+A implementação utiliza tasks, pois o MergeSort apresenta uma estrutura
+recursiva de divisão em subproblemas.
+
+Static, dynamic e guided são políticas de schedule para loops;
+não são substitutos diretos das tarefas recursivas utilizadas aqui.
+
+## 6. Cutoff e granularidade
+
+O cutoff determina quando a recursão deixa de gerar novas tarefas
+e passa a executar o MergeSort sequencial.
+
+Cutoff pequeno:
+- permite maior quantidade de tarefas;
+- aumenta o paralelismo potencial;
+- pode elevar o overhead de criação e gerenciamento.
+
+Cutoff grande:
+- reduz a quantidade de tarefas;
+- diminui o overhead;
+- pode limitar o paralelismo disponível.
+
+O valor adequado depende do tamanho da entrada, da máquina e do
+custo de gerenciamento das tarefas.
+
+## 7. Metodologia experimental do cutoff
+
+O experimento utiliza:
+- N = 20.000.000 elementos;
+- P = 4 threads;
+- cutoffs = 1024, 4096, 16384 e 65536;
+- uma execução de aquecimento;
+- quatro execuções consideradas;
+- mediana das quatro execuções válidas.
+
+A corretude é conferida pelo checksum do gabarito sequencial.
+
+Os resultados são registrados em resultados/cutoff.csv.
+
+## 8. Resultados
+
+Os resultados experimentais serão apresentados na tabela de cutoff,
+permitindo comparar o tempo de execução para cada granularidade.
+
+## 9. Conclusão
+
+A implementação explora o paralelismo recursivo com tasks e utiliza
+taskwait para garantir a dependência necessária antes da intercalação.
+
+O cutoff controla a granularidade das tarefas e permite avaliar
+experimentalmente o equilíbrio entre paralelismo e overhead.
+
+## 8.1 Resultados do experimento de cutoff
+
+Experimento realizado com N = 20.000.000 e P = 4 threads.
+Foi descartada a primeira execução de cada configuração e calculada
+a mediana das quatro execuções restantes.
+
+| Cutoff | Mediana (s) |
+|---:|---:|
+| 1024 | 0.828756 |
+| 4096 | 0.820618 |
+| 16384 | 0.857641 |
+| 65536 | 0.807908 |
+
+O menor tempo mediano observado foi obtido com cutoff = 65536,
+correspondendo a 0.807908 segundos.
+
+A diferença entre o menor e o maior tempo mediano foi de
+aproximadamente 6.15%.
+
+Os resultados demonstram que o cutoff influencia o desempenho
+da implementação, mas não apresenta uma relação monotônica
+entre seu valor e o tempo de execução.
+
+O cutoff = 65536 foi o melhor valor observado neste experimento.
+Essa conclusão é restrita à máquina, ao tamanho de entrada e
+à quantidade de threads utilizados.
+
+As diferenças de desempenho devem ser interpretadas considerando
+a variabilidade das execuções e o overhead de gerenciamento
+das tarefas.
