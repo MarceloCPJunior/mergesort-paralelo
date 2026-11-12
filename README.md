@@ -5,6 +5,22 @@ Programação Paralela · IESB 2026/2 · Prof. Rodrigo Gonçalves
 Paralelização do mergesort sequencial de referência (`07_mergesort.cpp`, fornecido pelo professor)
 em memória compartilhada (OpenMP) e memória distribuída (MPI).
 
+## Resultados
+
+Medição final num Intel Core i5-13420H (12 núcleos lógicos), n = 20 milhões, mediana de 4 repetições.
+O baseline do professor leva **1,935 s**.
+
+| p | OpenMP | MPI | Previsto (Amdahl, modelo da árvore) |
+|---|---|---|---|
+| 2 | 1,93× | 1,86× | 1,92× |
+| 4 | 2,56× | 3,11× | 3,43× |
+| 8 | 3,24× | 4,07× | 5,50× |
+
+As duas versões dão o mesmo resultado do baseline em todos os 112 casos da bateria de corretude.
+Discussão completa em [`docs/analise_experimental.md`](docs/analise_experimental.md).
+
+![Speedup medido e previsto](graficos/forte_speedup.png)
+
 ## Documentação
 
 | Documento | Conteúdo |
@@ -45,6 +61,10 @@ mergesort-paralelo/
 Requisitos: `g++` com OpenMP e OpenMPI (`mpicxx`, `mpirun`). No laboratório já existem;
 em casa, abra a pasta no VS Code e use F1 → **Dev Containers: Reopen in Container**
 (requer Docker Desktop e a extensão Dev Containers).
+
+Os gráficos usam Python 3 com **matplotlib**, que já vem no contêiner do projeto. Fora dele, se
+faltar: `pip install matplotlib` (ou `sudo apt install python3-matplotlib`). Os gráficos da medição
+final já estão em `graficos/`, então só é preciso o matplotlib para gerá-los de novo.
 
 ```bash
 git clone https://github.com/MarceloCPJunior/mergesort-paralelo.git
