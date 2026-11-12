@@ -19,12 +19,17 @@ cd "$(dirname "$0")/.."               # roda a partir da raiz do projeto
 EXPERIMENTO=${1:-todos}
 REP=${2:-5}
 SAIDA=resultados
-MPIRUN=${MPIRUN:-"mpirun --use-hwthread-cpus"}   # slots = núcleos lógicos (= nproc)
+# --use-hwthread-cpus: aceita até nproc processos (núcleos lógicos).
+# --bind-to none: o sistema operacional decide onde cada processo roda e espalha
+# primeiro pelos núcleos físicos, como faz com as threads do OpenMP. Sem isso, o
+# mpirun pode prender 2 processos nas duas threads de hardware do MESMO núcleo.
+MPIRUN=${MPIRUN:-"mpirun --use-hwthread-cpus --bind-to none"}
 
 TAMANHOS_BASELINE="5000000 20000000 80000000"
 N_FORTE=20000000                      # escalabilidade forte: n fixo
 N_BASE_FRACA=5000000                  # escalabilidade fraca: n = 5M x p
 NUCLEOS=$(nproc)
+ARQ_COMUNIC=""                        # só o experimento forte grava o tempo de comunicação
 
 # p = 1, 2, 4, 8... só até nproc: acima disso os núcleos seriam divididos e o
 # tempo pioraria por um motivo que não é do algoritmo.
@@ -67,7 +72,7 @@ roda() {
         if (( r > 1 )); then                     # a 1ª é aquecimento
             echo "$versao,$n,$p,$((r-1)),$t" >> "$arq"
             local tc; tc=$(campo t_comunicacao "$linha")
-            if [[ -n $tc ]]; then echo "$versao,$n,$p,$((r-1)),$t,$tc" >> "$SAIDA/mpi_comunicacao.csv"; fi
+            if [[ -n $tc && -n $ARQ_COMUNIC ]]; then echo "$versao,$n,$p,$((r-1)),$t,$tc" >> "$ARQ_COMUNIC"; fi
         fi
     done
     printf "  %-4s n=%-9s p=%-2s ok (checksum confere)\n" "$versao" "$n" "$p"
@@ -128,8 +133,10 @@ exp_forte() {
     echo "== escalabilidade forte — n = $N_FORTE, p = $LISTA_P"
     aviso_faltando
     local arq=$SAIDA/forte.csv; novo_csv "$arq"
-    echo "versao,n,p,repeticao,tempo_s,t_comunicacao_s" > "$SAIDA/mpi_comunicacao.csv"
+    ARQ_COMUNIC=$SAIDA/mpi_comunicacao.csv
+    echo "versao,n,p,repeticao,tempo_s,t_comunicacao_s" > "$ARQ_COMUNIC"
     roda_paralelas "$arq" "$N_FORTE"
+    ARQ_COMUNIC=""
     if [[ $(wc -l < "$arq") -gt 1 ]]; then resumo "$arq"; fi
 }
 
